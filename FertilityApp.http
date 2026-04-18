@@ -1,0 +1,6 @@
+@FertilityApp_HostAddress = http://localhost:5179
+
+GET {{FertilityApp_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

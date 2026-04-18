@@ -1,0 +1,39 @@
+{
+  "Version": 1,
+  "Hash": "1P8+ff0ZUWkuN36NaSrFMJH+teYTR8DDTe2hu/7qczs=",
+  "Source": "FertilityApp",
+  "BasePath": "_content/FertilityApp",
+  "Mode": "Default",
+  "ManifestType": "Publish",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [
+    {
+      "Name": "FertilityApp/wwwroot",
+      "Source": "FertilityApp",
+      "ContentRoot": "/Users/poojakulkarni/FertilityApp/wwwroot/",
+      "BasePath": "_content/FertilityApp",
+      "Pattern": "**"
+    }
+  ],
+  "Assets": [
+    {
+      "Identity": "/Users/poojakulkarni/FertilityApp/wwwroot/index.html",
+      "SourceId": "FertilityApp",
+      "SourceType": "Discovered",
+      "ContentRoot": "/Users/poojakulkarni/FertilityApp/wwwroot/",
+      "BasePath": "_content/FertilityApp",
+      "RelativePath": "index.html",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot/index.html"
+    }
+  ]
+}
