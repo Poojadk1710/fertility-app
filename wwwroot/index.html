@@ -91,7 +91,6 @@ tr:hover {
 
   <h1>The IVF Guide - Fertility Dashboard</h1>
 
-  <!-- ROLE -->
   <div class="card">
     <div class="row">
       <label for="role"><strong>Role:</strong></label>
@@ -103,12 +102,16 @@ tr:hover {
     </div>
   </div>
 
-  <!-- ADMIN / LAB: ADD PATIENT -->
+  <div class="card hidden" id="donorMessageCard">
+    <h3>Donor Access</h3>
+    <p>Donor cannot add, view, or delete patients in this dashboard.</p>
+  </div>
+
   <div class="card" id="addPatientCard">
     <h3>Add Patient</h3>
     <div class="row">
       <input id="name" placeholder="Name">
-      <input id="age" type="number" placeholder="Age">
+      <input id="age" type="number" placeholder="Age" min="1">
       <select id="stage">
         <option>Consultation</option>
         <option>Stimulation</option>
@@ -121,21 +124,10 @@ tr:hover {
     </div>
   </div>
 
-  <!-- ADMIN / LAB: LOAD PATIENTS -->
   <div class="card" id="patientActionsCard">
     <button class="primary" onclick="loadPatients()">Load Patients</button>
   </div>
 
-  <!-- DONOR: LOAD EMBRYOS -->
-  <div class="card hidden" id="donorCard">
-    <h3>Donor Embryo Status</h3>
-    <div class="row">
-      <input id="donorId" type="number" placeholder="Enter Donor ID">
-      <button class="primary" onclick="loadDonorEmbryos()">Load Embryo Status</button>
-    </div>
-  </div>
-
-  <!-- PATIENT TABLE -->
   <div class="card" id="patientsTableCard">
     <h3>Patients</h3>
     <table>
@@ -149,20 +141,6 @@ tr:hover {
         </tr>
       </thead>
       <tbody id="patientsTableBody"></tbody>
-    </table>
-  </div>
-
-  <!-- DONOR TABLE -->
-  <div class="card hidden" id="donorTableCard">
-    <h3>Embryo Status</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>Embryo ID</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody id="donorTableBody"></tbody>
     </table>
   </div>
 
@@ -199,36 +177,28 @@ function clearPatientsTable() {
   document.getElementById("patientsTableBody").innerHTML = "";
 }
 
-function clearDonorTable() {
-  document.getElementById("donorTableBody").innerHTML = "";
-}
-
 function updateRoleUI() {
   const role = getRole();
 
   const addPatientCard = document.getElementById("addPatientCard");
   const patientActionsCard = document.getElementById("patientActionsCard");
   const patientsTableCard = document.getElementById("patientsTableCard");
-  const donorCard = document.getElementById("donorCard");
-  const donorTableCard = document.getElementById("donorTableCard");
+  const donorMessageCard = document.getElementById("donorMessageCard");
   const actionHeader = document.getElementById("actionHeader");
 
   clearPatientsTable();
-  clearDonorTable();
   setStatus("");
 
   if (role === "donor") {
     addPatientCard.classList.add("hidden");
     patientActionsCard.classList.add("hidden");
     patientsTableCard.classList.add("hidden");
-    donorCard.classList.remove("hidden");
-    donorTableCard.classList.remove("hidden");
+    donorMessageCard.classList.remove("hidden");
   } else {
     addPatientCard.classList.remove("hidden");
     patientActionsCard.classList.remove("hidden");
     patientsTableCard.classList.remove("hidden");
-    donorCard.classList.add("hidden");
-    donorTableCard.classList.add("hidden");
+    donorMessageCard.classList.add("hidden");
 
     if (role === "lab") {
       actionHeader.classList.add("hidden");
@@ -245,10 +215,25 @@ async function addPatient() {
     return;
   }
 
+  const name = document.getElementById("name").value.trim();
+  const ageValue = document.getElementById("age").value;
+  const age = Number(ageValue);
+  const stage = document.getElementById("stage").value;
+
+  if (!name) {
+    setStatus("Please enter patient name", false);
+    return;
+  }
+
+  if (!ageValue || Number.isNaN(age) || age <= 0) {
+    setStatus("Please enter a valid numeric age", false);
+    return;
+  }
+
   const data = {
-    name: document.getElementById("name").value,
-    age: parseInt(document.getElementById("age").value),
-    treatmentStage: document.getElementById("stage").value
+    name: name,
+    age: age,
+    treatmentStage: stage
   };
 
   try {
@@ -333,55 +318,6 @@ async function deletePatient(id) {
       setStatus(await readError(res), false);
     }
   } catch (err) {
-    setStatus(`Network error: ${err.message}`, false);
-  }
-}
-
-async function loadDonorEmbryos() {
-  const role = getRole();
-  if (role !== "donor") {
-    setStatus("Only donor can view donor embryo status", false);
-    return;
-  }
-
-  clearDonorTable();
-
-  const donorId = document.getElementById("donorId").value;
-  if (!donorId) {
-    setStatus("Please enter Donor ID", false);
-    return;
-  }
-
-  try {
-    const res = await fetch(`${API}/donor/${donorId}/embryos`, {
-      headers: getHeaders()
-    });
-
-    if (!res.ok) {
-      setStatus(await readError(res), false);
-      return;
-    }
-
-    const data = await res.json();
-    const tbody = document.getElementById("donorTableBody");
-
-    if (data.length === 0) {
-      setStatus("No embryos found for this donor");
-      return;
-    }
-
-    data.forEach(e => {
-      tbody.innerHTML += `
-        <tr>
-          <td>${e.id}</td>
-          <td>${e.status}</td>
-        </tr>
-      `;
-    });
-
-    setStatus("Embryo status loaded ✅");
-  } catch (err) {
-    clearDonorTable();
     setStatus(`Network error: ${err.message}`, false);
   }
 }
