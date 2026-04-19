@@ -1,333 +1,3 @@
-<!-- <!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>The IVF Guide - Fertility Dashboard</title>
-
-<style>
-body {
-  font-family: Arial, sans-serif;
-  background: #f5f7fa;
-  margin: 0;
-  padding: 20px;
-}
-
-h1 {
-  text-align: center;
-}
-
-.container {
-  max-width: 1000px;
-  margin: auto;
-}
-
-.card {
-  background: white;
-  padding: 20px;
-  margin-bottom: 20px;
-  border-radius: 10px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-}
-
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-}
-
-input, select {
-  padding: 10px;
-  margin: 5px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-  min-width: 180px;
-}
-
-button {
-  padding: 10px 15px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  margin: 5px;
-  color: white;
-  font-size: 16px;
-}
-
-.primary { background: #007bff; }
-.danger { background: #dc3545; }
-.success { background: #28a745; }
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
-}
-
-th, td {
-  padding: 10px;
-  border-bottom: 1px solid #ddd;
-  text-align: center;
-}
-
-tr:hover {
-  background: #f1f1f1;
-}
-
-.status {
-  margin-top: 10px;
-  font-weight: bold;
-}
-
-.hidden {
-  display: none;
-}
-</style>
-</head>
-
-<body>
-
-<div class="container">
-
-  <h1>The IVF Guide - Fertility Dashboard</h1>
-
-  <div class="card">
-    <div class="row">
-      <label for="role"><strong>Role:</strong></label>
-      <select id="role" onchange="updateRoleUI()">
-        <option value="admin">Admin</option>
-        <option value="lab">Lab</option>
-        <option value="donor">Donor</option>
-      </select>
-    </div>
-  </div>
-
-  <div class="card hidden" id="donorMessageCard">
-    <h3>Donor Access</h3>
-    <p>Donor cannot add, view, or delete patients in this dashboard.</p>
-  </div>
-
-  <div class="card" id="addPatientCard">
-    <h3>Add Patient</h3>
-    <div class="row">
-      <input id="name" placeholder="Name">
-      <input id="age" type="number" placeholder="Age" min="1">
-      <select id="stage">
-        <option>Consultation</option>
-        <option>Stimulation</option>
-        <option>Egg Retrieval</option>
-        <option>Fertilization</option>
-        <option>Embryo Transfer</option>
-        <option>Pregnancy Test</option>
-      </select>
-      <button class="success" onclick="addPatient()">Add Patient</button>
-    </div>
-  </div>
-
-  <div class="card" id="patientActionsCard">
-    <button class="primary" onclick="loadPatients()">Load Patients</button>
-  </div>
-
-  <div class="card" id="patientsTableCard">
-    <h3>Patients</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Name</th>
-          <th>Age</th>
-          <th>Stage</th>
-          <th id="actionHeader">Action</th>
-        </tr>
-      </thead>
-      <tbody id="patientsTableBody"></tbody>
-    </table>
-  </div>
-
-  <div class="status" id="status"></div>
-
-</div>
-
-<script>
-const API = window.location.origin;
-
-function getRole() {
-  return document.getElementById("role").value;
-}
-
-function getHeaders() {
-  return {
-    "Content-Type": "application/json",
-    "role": getRole()
-  };
-}
-
-function setStatus(msg, ok = true) {
-  const el = document.getElementById("status");
-  el.style.color = ok ? "green" : "red";
-  el.innerText = msg;
-}
-
-async function readError(res) {
-  const text = await res.text();
-  return text ? `HTTP ${res.status}: ${text}` : `HTTP ${res.status}`;
-}
-
-function clearPatientsTable() {
-  document.getElementById("patientsTableBody").innerHTML = "";
-}
-
-function updateRoleUI() {
-  const role = getRole();
-
-  const addPatientCard = document.getElementById("addPatientCard");
-  const patientActionsCard = document.getElementById("patientActionsCard");
-  const patientsTableCard = document.getElementById("patientsTableCard");
-  const donorMessageCard = document.getElementById("donorMessageCard");
-  const actionHeader = document.getElementById("actionHeader");
-
-  clearPatientsTable();
-  setStatus("");
-
-  if (role === "donor") {
-    addPatientCard.classList.add("hidden");
-    patientActionsCard.classList.add("hidden");
-    patientsTableCard.classList.add("hidden");
-    donorMessageCard.classList.remove("hidden");
-  } else {
-    addPatientCard.classList.remove("hidden");
-    patientActionsCard.classList.remove("hidden");
-    patientsTableCard.classList.remove("hidden");
-    donorMessageCard.classList.add("hidden");
-
-    if (role === "lab") {
-      actionHeader.classList.add("hidden");
-    } else {
-      actionHeader.classList.remove("hidden");
-    }
-  }
-}
-
-async function addPatient() {
-  const role = getRole();
-  if (role === "donor") {
-    setStatus("HTTP 401: Donor cannot add patients", false);
-    return;
-  }
-
-  const name = document.getElementById("name").value.trim();
-  const ageValue = document.getElementById("age").value;
-  const age = Number(ageValue);
-  const stage = document.getElementById("stage").value;
-
-  if (!name) {
-    setStatus("Please enter patient name", false);
-    return;
-  }
-
-  if (!ageValue || Number.isNaN(age) || age <= 0) {
-    setStatus("Please enter a valid numeric age", false);
-    return;
-  }
-
-  const data = {
-    name: name,
-    age: age,
-    treatmentStage: stage
-  };
-
-  try {
-    const res = await fetch(`${API}/patients`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify(data)
-    });
-
-    if (res.ok) {
-      setStatus("Patient added ✅");
-      document.getElementById("name").value = "";
-      document.getElementById("age").value = "";
-      document.getElementById("stage").selectedIndex = 0;
-    } else {
-      setStatus(await readError(res), false);
-    }
-  } catch (err) {
-    setStatus(`Network error: ${err.message}`, false);
-  }
-}
-
-async function loadPatients() {
-  const role = getRole();
-  if (role === "donor") {
-    setStatus("HTTP 401: Donor cannot view patients", false);
-    return;
-  }
-
-  clearPatientsTable();
-
-  try {
-    const res = await fetch(`${API}/patients`, {
-      headers: getHeaders()
-    });
-
-    if (!res.ok) {
-      setStatus(await readError(res), false);
-      return;
-    }
-
-    const data = await res.json();
-    const tbody = document.getElementById("patientsTableBody");
-
-    data.forEach(p => {
-      const showDelete = role === "admin";
-      tbody.innerHTML += `
-        <tr>
-          <td>${p.id}</td>
-          <td>${p.name}</td>
-          <td>${p.age}</td>
-          <td>${p.treatmentStage}</td>
-          <td>${showDelete ? `<button class="danger" onclick="deletePatient(${p.id})">Delete</button>` : ``}</td>
-        </tr>
-      `;
-    });
-
-    setStatus("Patients loaded ✅");
-  } catch (err) {
-    clearPatientsTable();
-    setStatus(`Network error: ${err.message}`, false);
-  }
-}
-
-async function deletePatient(id) {
-  const role = getRole();
-  if (role !== "admin") {
-    setStatus("HTTP 401: Only admin can delete patients", false);
-    return;
-  }
-
-  try {
-    const res = await fetch(`${API}/patients/${id}`, {
-      method: "DELETE",
-      headers: getHeaders()
-    });
-
-    if (res.ok) {
-      setStatus("Deleted ✅");
-      loadPatients();
-    } else {
-      setStatus(await readError(res), false);
-    }
-  } catch (err) {
-    setStatus(`Network error: ${err.message}`, false);
-  }
-}
-
-updateRoleUI();
-</script>
-
-</body>
-</html> -->
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -387,6 +57,7 @@ button {
 .primary { background: #007bff; }
 .danger { background: #dc3545; }
 .success { background: #28a745; }
+.secondary { background: #6c757d; }
 
 table {
   width: 100%;
@@ -415,6 +86,10 @@ tr:hover {
 
 ul {
   padding-left: 20px;
+}
+
+.section-actions {
+  margin-bottom: 10px;
 }
 </style>
 </head>
@@ -457,19 +132,26 @@ ul {
   <!-- PATIENT ACTIONS -->
   <div class="card" id="patientActionsCard">
     <button class="primary" onclick="loadPatients()">Load Patients</button>
+    <button class="secondary" onclick="downloadPatientsCSV()">Download Patients CSV</button>
   </div>
 
   <!-- DONORS -->
   <div class="card" id="donorActionsCard">
     <h3>Donors</h3>
-    <button class="primary" onclick="loadDonors()">Load Donors</button>
+    <div class="section-actions">
+      <button class="primary" onclick="loadDonors()">Load Donors</button>
+      <button class="secondary" onclick="downloadDonorsCSV()">Download Donors CSV</button>
+    </div>
     <ul id="donorList"></ul>
   </div>
 
   <!-- ADMIN ONLY RECORDS -->
   <div class="card hidden" id="adminRecordsCard">
     <h3>Admin Records: Donor → Embryo → Patient</h3>
-    <button class="primary" onclick="loadAdminRecords()">Load Records</button>
+    <div class="section-actions">
+      <button class="primary" onclick="loadAdminRecords()">Load Records</button>
+      <button class="secondary" onclick="downloadRecordsCSV()">Download Records CSV</button>
+    </div>
     <table>
       <thead>
         <tr>
@@ -506,6 +188,7 @@ ul {
     <div class="row">
       <input id="donorId" type="number" placeholder="Enter Donor ID">
       <button class="primary" onclick="loadDonorEmbryos()">Load Embryo Status</button>
+      <button class="secondary" onclick="downloadDonorCSV()">Download Embryo CSV</button>
     </div>
   </div>
 
@@ -529,6 +212,13 @@ ul {
 <script>
 const API = window.location.origin;
 
+// Cache for CSV downloads
+let patientsCache = [];
+let donorsCache = [];
+let recordsCache = [];
+let donorEmbryosCache = [];
+
+// ================= GENERAL HELPERS =================
 function getRole() {
   return document.getElementById("role").value;
 }
@@ -567,6 +257,13 @@ function clearDonorEmbryoTable() {
   document.getElementById("donorEmbryoBody").innerHTML = "";
 }
 
+function resetCaches() {
+  patientsCache = [];
+  donorsCache = [];
+  recordsCache = [];
+  donorEmbryosCache = [];
+}
+
 function updateRoleUI() {
   const role = getRole();
 
@@ -583,6 +280,7 @@ function updateRoleUI() {
   clearDonorList();
   clearRecordsTable();
   clearDonorEmbryoTable();
+  resetCaches();
   setStatus("");
 
   if (role === "donor") {
@@ -612,6 +310,28 @@ function updateRoleUI() {
   }
 }
 
+// ================= CSV HELPERS =================
+function downloadCSV(filename, rows) {
+  if (!rows.length) {
+    setStatus("Nothing to download ❌", false);
+    return;
+  }
+
+  const csvContent =
+    "data:text/csv;charset=utf-8," +
+    rows
+      .map(row => row.map(value => `"${String(value ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+  const link = document.createElement("a");
+  link.href = encodeURI(csvContent);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// ================= ADD PATIENT =================
 async function addPatient() {
   const role = getRole();
   if (role === "donor") {
@@ -652,6 +372,7 @@ async function addPatient() {
       document.getElementById("name").value = "";
       document.getElementById("age").value = "";
       document.getElementById("stage").selectedIndex = 0;
+      await loadPatients(false);
     } else {
       setStatus(await readError(res), false);
     }
@@ -660,7 +381,8 @@ async function addPatient() {
   }
 }
 
-async function loadPatients() {
+// ================= PATIENTS =================
+async function loadPatients(showMessage = true) {
   const role = getRole();
   if (role === "donor") {
     setStatus("HTTP 401: Donor cannot view patients", false);
@@ -668,6 +390,7 @@ async function loadPatients() {
   }
 
   clearPatientsTable();
+  patientsCache = [];
 
   try {
     const res = await fetch(`${API}/patients`, {
@@ -680,6 +403,8 @@ async function loadPatients() {
     }
 
     const data = await res.json();
+    patientsCache = data;
+
     const tbody = document.getElementById("patientsTableBody");
 
     data.forEach(p => {
@@ -695,7 +420,9 @@ async function loadPatients() {
       `;
     });
 
-    setStatus("Patients loaded ✅");
+    if (showMessage) {
+      setStatus("Patients loaded ✅");
+    }
   } catch (err) {
     clearPatientsTable();
     setStatus(`Network error: ${err.message}`, false);
@@ -716,7 +443,7 @@ async function deletePatient(id) {
 
     if (res.ok) {
       setStatus("Deleted ✅");
-      loadPatients();
+      loadPatients(false);
     } else {
       setStatus(await readError(res), false);
     }
@@ -725,6 +452,31 @@ async function deletePatient(id) {
   }
 }
 
+async function downloadPatientsCSV() {
+  if (getRole() === "donor") {
+    setStatus("Unauthorized ❌", false);
+    return;
+  }
+
+  if (!patientsCache.length) {
+    await loadPatients(false);
+  }
+
+  if (!patientsCache.length) {
+    setStatus("No patients to download ❌", false);
+    return;
+  }
+
+  const rows = [
+    ["ID", "Name", "Age", "Stage"],
+    ...patientsCache.map(p => [p.id, p.name, p.age, p.treatmentStage])
+  ];
+
+  downloadCSV("patients.csv", rows);
+  setStatus("Patients CSV downloaded ✅");
+}
+
+// ================= DONORS =================
 async function loadDonors() {
   const role = getRole();
   if (role === "donor") {
@@ -733,6 +485,7 @@ async function loadDonors() {
   }
 
   clearDonorList();
+  donorsCache = [];
 
   try {
     const res = await fetch(`${API}/donors`, {
@@ -745,6 +498,8 @@ async function loadDonors() {
     }
 
     const data = await res.json();
+    donorsCache = data;
+
     const donorList = document.getElementById("donorList");
 
     data.forEach(d => {
@@ -757,6 +512,31 @@ async function loadDonors() {
   }
 }
 
+async function downloadDonorsCSV() {
+  if (getRole() === "donor") {
+    setStatus("Unauthorized ❌", false);
+    return;
+  }
+
+  if (!donorsCache.length) {
+    await loadDonors();
+  }
+
+  if (!donorsCache.length) {
+    setStatus("No donors to download ❌", false);
+    return;
+  }
+
+  const rows = [
+    ["ID", "Name"],
+    ...donorsCache.map(d => [d.id, d.name ?? d.code ?? "Donor"])
+  ];
+
+  downloadCSV("donors.csv", rows);
+  setStatus("Donors CSV downloaded ✅");
+}
+
+// ================= ADMIN RECORDS =================
 async function loadAdminRecords() {
   if (getRole() !== "admin") {
     setStatus("HTTP 401: Admin only", false);
@@ -764,6 +544,7 @@ async function loadAdminRecords() {
   }
 
   clearRecordsTable();
+  recordsCache = [];
 
   try {
     const res = await fetch(`${API}/admin/records`, {
@@ -776,6 +557,8 @@ async function loadAdminRecords() {
     }
 
     const data = await res.json();
+    recordsCache = data;
+
     const tbody = document.getElementById("recordsTableBody");
 
     data.forEach(r => {
@@ -795,13 +578,39 @@ async function loadAdminRecords() {
   }
 }
 
-async function loadDonorEmbryos() {
+async function downloadRecordsCSV() {
+  if (getRole() !== "admin") {
+    setStatus("Admin only ❌", false);
+    return;
+  }
+
+  if (!recordsCache.length) {
+    await loadAdminRecords();
+  }
+
+  if (!recordsCache.length) {
+    setStatus("No records to download ❌", false);
+    return;
+  }
+
+  const rows = [
+    ["Embryo ID", "Patient", "Donor", "Status"],
+    ...recordsCache.map(r => [r.embryoId, r.patientName, r.donorName, r.status])
+  ];
+
+  downloadCSV("admin-records.csv", rows);
+  setStatus("Admin records CSV downloaded ✅");
+}
+
+// ================= DONOR EMBRYOS =================
+async function loadDonorEmbryos(showMessage = true) {
   if (getRole() !== "donor") {
     setStatus("Only donor can use this view", false);
     return;
   }
 
   clearDonorEmbryoTable();
+  donorEmbryosCache = [];
 
   const donorId = document.getElementById("donorId").value;
   if (!donorId) {
@@ -820,6 +629,8 @@ async function loadDonorEmbryos() {
     }
 
     const data = await res.json();
+    donorEmbryosCache = data;
+
     const tbody = document.getElementById("donorEmbryoBody");
 
     if (data.length === 0) {
@@ -836,10 +647,42 @@ async function loadDonorEmbryos() {
       `;
     });
 
-    setStatus("Embryo status loaded ✅");
+    if (showMessage) {
+      setStatus("Embryo status loaded ✅");
+    }
   } catch (err) {
     setStatus(`Network error: ${err.message}`, false);
   }
+}
+
+async function downloadDonorCSV() {
+  if (getRole() !== "donor") {
+    setStatus("Donor only ❌", false);
+    return;
+  }
+
+  const donorId = document.getElementById("donorId").value;
+  if (!donorId) {
+    setStatus("Please enter donor ID", false);
+    return;
+  }
+
+  if (!donorEmbryosCache.length) {
+    await loadDonorEmbryos(false);
+  }
+
+  if (!donorEmbryosCache.length) {
+    setStatus("No donor embryo data to download ❌", false);
+    return;
+  }
+
+  const rows = [
+    ["Embryo ID", "Status"],
+    ...donorEmbryosCache.map(e => [e.id, e.status])
+  ];
+
+  downloadCSV(`donor-${donorId}-embryos.csv`, rows);
+  setStatus("Donor embryo CSV downloaded ✅");
 }
 
 updateRoleUI();
