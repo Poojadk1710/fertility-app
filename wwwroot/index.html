@@ -129,6 +129,31 @@ ul {
     </div>
   </div>
 
+  <!-- ADD DONOR -->
+  <div class="card" id="addDonorCard">
+    <h3>Add Donor</h3>
+    <div class="row">
+      <input id="donorCode" placeholder="Donor Code (e.g. DNR-103)">
+      <button class="success" onclick="addDonor()">Add Donor</button>
+    </div>
+  </div>
+
+  <!-- ADD EMBRYO -->
+  <div class="card" id="addEmbryoCard">
+    <h3>Add Embryo Record</h3>
+    <div class="row">
+      <input id="embryoPatientId" type="number" placeholder="Patient ID">
+      <input id="embryoDonorId" type="number" placeholder="Donor ID">
+      <select id="embryoStatus">
+        <option>Stored</option>
+        <option>Frozen</option>
+        <option>Transferred</option>
+        <option>Discarded</option>
+      </select>
+      <button class="success" onclick="addEmbryo()">Add Embryo</button>
+    </div>
+  </div>
+
   <!-- PATIENT ACTIONS -->
   <div class="card" id="patientActionsCard">
     <button class="primary" onclick="loadPatients()">Load Patients</button>
@@ -145,7 +170,7 @@ ul {
     <ul id="donorList"></ul>
   </div>
 
-  <!-- ADMIN ONLY RECORDS -->
+  <!-- ADMIN RECORDS -->
   <div class="card hidden" id="adminRecordsCard">
     <h3>Admin Records: Donor → Embryo → Patient</h3>
     <div class="section-actions">
@@ -212,13 +237,11 @@ ul {
 <script>
 const API = window.location.origin;
 
-// Cache for CSV downloads
 let patientsCache = [];
 let donorsCache = [];
 let recordsCache = [];
 let donorEmbryosCache = [];
 
-// ================= GENERAL HELPERS =================
 function getRole() {
   return document.getElementById("role").value;
 }
@@ -268,6 +291,8 @@ function updateRoleUI() {
   const role = getRole();
 
   const addPatientCard = document.getElementById("addPatientCard");
+  const addDonorCard = document.getElementById("addDonorCard");
+  const addEmbryoCard = document.getElementById("addEmbryoCard");
   const patientActionsCard = document.getElementById("patientActionsCard");
   const patientsTableCard = document.getElementById("patientsTableCard");
   const donorActionsCard = document.getElementById("donorActionsCard");
@@ -285,6 +310,8 @@ function updateRoleUI() {
 
   if (role === "donor") {
     addPatientCard.classList.add("hidden");
+    addDonorCard.classList.add("hidden");
+    addEmbryoCard.classList.add("hidden");
     patientActionsCard.classList.add("hidden");
     patientsTableCard.classList.add("hidden");
     donorActionsCard.classList.add("hidden");
@@ -301,16 +328,19 @@ function updateRoleUI() {
     donorTableCard.classList.add("hidden");
 
     if (role === "admin") {
+      addDonorCard.classList.remove("hidden");
+      addEmbryoCard.classList.remove("hidden");
       adminRecordsCard.classList.remove("hidden");
       actionHeader.classList.remove("hidden");
     } else {
+      addDonorCard.classList.add("hidden");
+      addEmbryoCard.classList.remove("hidden");
       adminRecordsCard.classList.add("hidden");
       actionHeader.classList.add("hidden");
     }
   }
 }
 
-// ================= CSV HELPERS =================
 function downloadCSV(filename, rows) {
   if (!rows.length) {
     setStatus("Nothing to download ❌", false);
@@ -319,9 +349,7 @@ function downloadCSV(filename, rows) {
 
   const csvContent =
     "data:text/csv;charset=utf-8," +
-    rows
-      .map(row => row.map(value => `"${String(value ?? "").replace(/"/g, '""')}"`).join(","))
-      .join("\n");
+    rows.map(row => row.map(value => `"${String(value ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
 
   const link = document.createElement("a");
   link.href = encodeURI(csvContent);
@@ -331,7 +359,6 @@ function downloadCSV(filename, rows) {
   document.body.removeChild(link);
 }
 
-// ================= ADD PATIENT =================
 async function addPatient() {
   const role = getRole();
   if (role === "donor") {
@@ -354,17 +381,11 @@ async function addPatient() {
     return;
   }
 
-  const data = {
-    name: name,
-    age: age,
-    treatmentStage: stage
-  };
-
   try {
     const res = await fetch(`${API}/patients`, {
       method: "POST",
       headers: getHeaders(),
-      body: JSON.stringify(data)
+      body: JSON.stringify({ name, age, treatmentStage: stage })
     });
 
     if (res.ok) {
@@ -381,10 +402,75 @@ async function addPatient() {
   }
 }
 
-// ================= PATIENTS =================
-async function loadPatients(showMessage = true) {
+async function addDonor() {
+  if (getRole() !== "admin") {
+    setStatus("HTTP 401: Only admin can add donors", false);
+    return;
+  }
+
+  const code = document.getElementById("donorCode").value.trim();
+  if (!code) {
+    setStatus("Please enter donor code", false);
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API}/donors`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ code })
+    });
+
+    if (res.ok) {
+      setStatus("Donor added ✅");
+      document.getElementById("donorCode").value = "";
+      await loadDonors();
+    } else {
+      setStatus(await readError(res), false);
+    }
+  } catch (err) {
+    setStatus(`Network error: ${err.message}`, false);
+  }
+}
+
+async function addEmbryo() {
   const role = getRole();
-  if (role === "donor") {
+  if (role !== "admin" && role !== "lab") {
+    setStatus("HTTP 401: Unauthorized", false);
+    return;
+  }
+
+  const patientId = Number(document.getElementById("embryoPatientId").value);
+  const donorId = Number(document.getElementById("embryoDonorId").value);
+  const status = document.getElementById("embryoStatus").value;
+
+  if (!patientId || !donorId) {
+    setStatus("Please enter valid Patient ID and Donor ID", false);
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API}/embryos`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ patientId, donorId, status })
+    });
+
+    if (res.ok) {
+      setStatus("Embryo record added ✅");
+      document.getElementById("embryoPatientId").value = "";
+      document.getElementById("embryoDonorId").value = "";
+      document.getElementById("embryoStatus").selectedIndex = 0;
+    } else {
+      setStatus(await readError(res), false);
+    }
+  } catch (err) {
+    setStatus(`Network error: ${err.message}`, false);
+  }
+}
+
+async function loadPatients(showMessage = true) {
+  if (getRole() === "donor") {
     setStatus("HTTP 401: Donor cannot view patients", false);
     return;
   }
@@ -408,7 +494,7 @@ async function loadPatients(showMessage = true) {
     const tbody = document.getElementById("patientsTableBody");
 
     data.forEach(p => {
-      const showDelete = role === "admin";
+      const showDelete = getRole() === "admin";
       tbody.innerHTML += `
         <tr>
           <td>${p.id}</td>
@@ -420,11 +506,8 @@ async function loadPatients(showMessage = true) {
       `;
     });
 
-    if (showMessage) {
-      setStatus("Patients loaded ✅");
-    }
+    if (showMessage) setStatus("Patients loaded ✅");
   } catch (err) {
-    clearPatientsTable();
     setStatus(`Network error: ${err.message}`, false);
   }
 }
@@ -443,7 +526,7 @@ async function deletePatient(id) {
 
     if (res.ok) {
       setStatus("Deleted ✅");
-      loadPatients(false);
+      await loadPatients(false);
     } else {
       setStatus(await readError(res), false);
     }
@@ -452,34 +535,8 @@ async function deletePatient(id) {
   }
 }
 
-async function downloadPatientsCSV() {
-  if (getRole() === "donor") {
-    setStatus("Unauthorized ❌", false);
-    return;
-  }
-
-  if (!patientsCache.length) {
-    await loadPatients(false);
-  }
-
-  if (!patientsCache.length) {
-    setStatus("No patients to download ❌", false);
-    return;
-  }
-
-  const rows = [
-    ["ID", "Name", "Age", "Stage"],
-    ...patientsCache.map(p => [p.id, p.name, p.age, p.treatmentStage])
-  ];
-
-  downloadCSV("patients.csv", rows);
-  setStatus("Patients CSV downloaded ✅");
-}
-
-// ================= DONORS =================
 async function loadDonors() {
-  const role = getRole();
-  if (role === "donor") {
+  if (getRole() === "donor") {
     setStatus("HTTP 401: Donor cannot view donor list", false);
     return;
   }
@@ -501,9 +558,8 @@ async function loadDonors() {
     donorsCache = data;
 
     const donorList = document.getElementById("donorList");
-
     data.forEach(d => {
-      donorList.innerHTML += `<li>${d.name ?? d.code ?? "Donor"} (ID: ${d.id})</li>`;
+      donorList.innerHTML += `<li>${d.code} (ID: ${d.id})</li>`;
     });
 
     setStatus("Donors loaded ✅");
@@ -512,31 +568,6 @@ async function loadDonors() {
   }
 }
 
-async function downloadDonorsCSV() {
-  if (getRole() === "donor") {
-    setStatus("Unauthorized ❌", false);
-    return;
-  }
-
-  if (!donorsCache.length) {
-    await loadDonors();
-  }
-
-  if (!donorsCache.length) {
-    setStatus("No donors to download ❌", false);
-    return;
-  }
-
-  const rows = [
-    ["ID", "Name"],
-    ...donorsCache.map(d => [d.id, d.name ?? d.code ?? "Donor"])
-  ];
-
-  downloadCSV("donors.csv", rows);
-  setStatus("Donors CSV downloaded ✅");
-}
-
-// ================= ADMIN RECORDS =================
 async function loadAdminRecords() {
   if (getRole() !== "admin") {
     setStatus("HTTP 401: Admin only", false);
@@ -560,13 +591,12 @@ async function loadAdminRecords() {
     recordsCache = data;
 
     const tbody = document.getElementById("recordsTableBody");
-
     data.forEach(r => {
       tbody.innerHTML += `
         <tr>
           <td>${r.embryoId}</td>
           <td>${r.patientName}</td>
-          <td>${r.donorName}</td>
+          <td>${r.donorCode}</td>
           <td>${r.status}</td>
         </tr>
       `;
@@ -578,31 +608,6 @@ async function loadAdminRecords() {
   }
 }
 
-async function downloadRecordsCSV() {
-  if (getRole() !== "admin") {
-    setStatus("Admin only ❌", false);
-    return;
-  }
-
-  if (!recordsCache.length) {
-    await loadAdminRecords();
-  }
-
-  if (!recordsCache.length) {
-    setStatus("No records to download ❌", false);
-    return;
-  }
-
-  const rows = [
-    ["Embryo ID", "Patient", "Donor", "Status"],
-    ...recordsCache.map(r => [r.embryoId, r.patientName, r.donorName, r.status])
-  ];
-
-  downloadCSV("admin-records.csv", rows);
-  setStatus("Admin records CSV downloaded ✅");
-}
-
-// ================= DONOR EMBRYOS =================
 async function loadDonorEmbryos(showMessage = true) {
   if (getRole() !== "donor") {
     setStatus("Only donor can use this view", false);
@@ -634,7 +639,7 @@ async function loadDonorEmbryos(showMessage = true) {
     const tbody = document.getElementById("donorEmbryoBody");
 
     if (data.length === 0) {
-      setStatus("No embryos found for this donor");
+      setStatus("No embryo records found for this donor", false);
       return;
     }
 
@@ -647,23 +652,56 @@ async function loadDonorEmbryos(showMessage = true) {
       `;
     });
 
-    if (showMessage) {
-      setStatus("Embryo status loaded ✅");
-    }
+    if (showMessage) setStatus("Embryo status loaded ✅");
   } catch (err) {
     setStatus(`Network error: ${err.message}`, false);
   }
 }
 
-async function downloadDonorCSV() {
-  if (getRole() !== "donor") {
-    setStatus("Donor only ❌", false);
+async function downloadPatientsCSV() {
+  if (!patientsCache.length) await loadPatients(false);
+  if (!patientsCache.length) return;
+
+  const rows = [
+    ["ID", "Name", "Age", "Stage"],
+    ...patientsCache.map(p => [p.id, p.name, p.age, p.treatmentStage])
+  ];
+  downloadCSV("patients.csv", rows);
+  setStatus("Patients CSV downloaded ✅");
+}
+
+async function downloadDonorsCSV() {
+  if (!donorsCache.length) await loadDonors();
+  if (!donorsCache.length) return;
+
+  const rows = [
+    ["ID", "Code"],
+    ...donorsCache.map(d => [d.id, d.code])
+  ];
+  downloadCSV("donors.csv", rows);
+  setStatus("Donors CSV downloaded ✅");
+}
+
+async function downloadRecordsCSV() {
+  if (getRole() !== "admin") {
+    setStatus("Admin only ❌", false);
     return;
   }
 
-  const donorId = document.getElementById("donorId").value;
-  if (!donorId) {
-    setStatus("Please enter donor ID", false);
+  if (!recordsCache.length) await loadAdminRecords();
+  if (!recordsCache.length) return;
+
+  const rows = [
+    ["Embryo ID", "Patient", "Donor", "Status"],
+    ...recordsCache.map(r => [r.embryoId, r.patientName, r.donorCode, r.status])
+  ];
+  downloadCSV("admin-records.csv", rows);
+  setStatus("Admin records CSV downloaded ✅");
+}
+
+async function downloadDonorCSV() {
+  if (getRole() !== "donor") {
+    setStatus("Donor only ❌", false);
     return;
   }
 
@@ -676,11 +714,11 @@ async function downloadDonorCSV() {
     return;
   }
 
+  const donorId = document.getElementById("donorId").value;
   const rows = [
     ["Embryo ID", "Status"],
     ...donorEmbryosCache.map(e => [e.id, e.status])
   ];
-
   downloadCSV(`donor-${donorId}-embryos.csv`, rows);
   setStatus("Donor embryo CSV downloaded ✅");
 }
