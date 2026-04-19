@@ -73,18 +73,16 @@ tr:hover { background: #f1f1f1; }
 
 <h1>The IVF Guide - Fertility Dashboard</h1>
 
-<!-- ROLE -->
 <div class="card">
   <label>Role:</label>
-  <select id="role">
+  <select id="role" onchange="updateRoleUI()">
     <option value="admin">Admin</option>
     <option value="lab">Lab</option>
     <option value="donor">Donor</option>
   </select>
 </div>
 
-<!-- ADD PATIENT -->
-<div class="card">
+<div class="card" id="addPatientCard">
   <h3>Add Patient</h3>
   <input id="name" placeholder="Name">
   <input id="age" type="number" placeholder="Age">
@@ -101,12 +99,10 @@ tr:hover { background: #f1f1f1; }
   <button class="success" onclick="addPatient()">Add Patient</button>
 </div>
 
-<!-- ACTIONS -->
 <div class="card">
   <button class="primary" onclick="loadPatients()">Load Patients</button>
 </div>
 
-<!-- TABLE -->
 <div class="card">
   <h3>Patients</h3>
   <table>
@@ -116,7 +112,7 @@ tr:hover { background: #f1f1f1; }
         <th>Name</th>
         <th>Age</th>
         <th>Stage</th>
-        <th>Action</th>
+        <th id="actionHeader">Action</th>
       </tr>
     </thead>
     <tbody id="tableBody"></tbody>
@@ -127,120 +123,17 @@ tr:hover { background: #f1f1f1; }
 
 </div>
 
-<!-- <script>
-const API = window.location.origin;
-
-// -------------------------
-function getHeaders() {
-  return {
-    "Content-Type": "application/json",
-    "role": document.getElementById("role").value
-  };
-}
-
-function setStatus(msg, ok=true) {
-  const el = document.getElementById("status");
-  el.style.color = ok ? "green" : "red";
-  el.innerText = msg;
-}
-
-// -------------------------
-async function addPatient() {
-  const data = {
-    name: document.getElementById("name").value,
-    age: parseInt(document.getElementById("age").value),
-    treatmentStage: document.getElementById("stage").value
-  };
-
-  try {
-    const res = await fetch(`${API}/patients`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify(data)
-    });
-
-    if (res.ok) {
-      setStatus("Patient added ");
-      loadPatients();
-    } else {
-      const msg = await res.text();
-      setStatus("Error: " + msg, false);
-    }
-
-  } catch (err) {
-    setStatus("Network error ", false);
-  }
-}
-
-// -------------------------
-async function loadPatients() {
-  try {
-    const res = await fetch(`${API}/patients`, {
-      headers: getHeaders()
-    });
-
-    if (!res.ok) {
-      const msg = await res.text();
-      setStatus("Error: " + msg, false);
-      return;
-    }
-
-    const data = await res.json();
-
-    const tbody = document.getElementById("tableBody");
-    tbody.innerHTML = "";
-
-    data.forEach(p => {
-      tbody.innerHTML += `
-        <tr>
-          <td>${p.id}</td>
-          <td>${p.name}</td>
-          <td>${p.age}</td>
-          <td>${p.treatmentStage}</td>
-          <td>
-            <button class="danger" onclick="deletePatient(${p.id})">
-              Delete
-            </button>
-          </td>
-        </tr>
-      `;
-    });
-
-    setStatus("Patients loaded ");
-
-  } catch {
-    setStatus("Network error ", false);
-  }
-}
-
-// -------------------------
-async function deletePatient(id) {
-  try {
-    const res = await fetch(`${API}/patients/${id}`, {
-      method: "DELETE",
-      headers: getHeaders()
-    });
-
-    if (res.ok) {
-      setStatus("Deleted ");
-      loadPatients();
-    } else {
-      const msg = await res.text();
-      setStatus("Error: " + msg, false);
-    }
-
-  } catch {
-    setStatus("Network error ", false);
-  }
-}
-</script> -->
 <script>
 const API = window.location.origin;
 
+function getRole() {
+  return document.getElementById("role").value;
+}
+
 function getHeaders() {
   return {
     "Content-Type": "application/json",
-    "role": document.getElementById("role").value
+    "role": getRole()
   };
 }
 
@@ -255,7 +148,34 @@ async function readError(res) {
   return text ? `HTTP ${res.status}: ${text}` : `HTTP ${res.status}`;
 }
 
+function clearTable() {
+  document.getElementById("tableBody").innerHTML = "";
+}
+
+function updateRoleUI() {
+  const role = getRole();
+  const addPatientCard = document.getElementById("addPatientCard");
+  const actionHeader = document.getElementById("actionHeader");
+
+  clearTable();
+  setStatus("");
+
+  if (role === "donor") {
+    addPatientCard.style.display = "none";
+    actionHeader.style.display = "none";
+  } else {
+    addPatientCard.style.display = "block";
+    actionHeader.style.display = "";
+  }
+}
+
 async function addPatient() {
+  const role = getRole();
+  if (role === "donor") {
+    setStatus("HTTP 401: Donor cannot add patients", false);
+    return;
+  }
+
   const data = {
     name: document.getElementById("name").value,
     age: parseInt(document.getElementById("age").value),
@@ -281,6 +201,11 @@ async function addPatient() {
 }
 
 async function loadPatients() {
+  const tbody = document.getElementById("tableBody");
+  const role = getRole();
+
+  clearTable();
+
   try {
     const res = await fetch(`${API}/patients`, {
       headers: getHeaders()
@@ -292,30 +217,35 @@ async function loadPatients() {
     }
 
     const data = await res.json();
-    const tbody = document.getElementById("tableBody");
-    tbody.innerHTML = "";
 
     data.forEach(p => {
+      const showDelete = role === "admin";
+
       tbody.innerHTML += `
         <tr>
           <td>${p.id}</td>
           <td>${p.name}</td>
           <td>${p.age}</td>
           <td>${p.treatmentStage}</td>
-          <td>
-            <button class="danger" onclick="deletePatient(${p.id})">Delete</button>
-          </td>
+          <td>${showDelete ? `<button class="danger" onclick="deletePatient(${p.id})">Delete</button>` : ""}</td>
         </tr>
       `;
     });
 
     setStatus("Patients loaded ✅");
   } catch (err) {
+    clearTable();
     setStatus(`Network error: ${err.message}`, false);
   }
 }
 
 async function deletePatient(id) {
+  const role = getRole();
+  if (role !== "admin") {
+    setStatus("HTTP 401: Only admin can delete patients", false);
+    return;
+  }
+
   try {
     const res = await fetch(`${API}/patients/${id}`, {
       method: "DELETE",
@@ -332,6 +262,9 @@ async function deletePatient(id) {
     setStatus(`Network error: ${err.message}`, false);
   }
 }
+
+updateRoleUI();
 </script>
+
 </body>
 </html>
