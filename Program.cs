@@ -29,7 +29,7 @@ builder.Services.AddSwaggerGen(options =>
                     Id = "RoleHeader"
                 }
             },
-            new string[] {}
+            Array.Empty<string>()
         }
     });
 });
@@ -48,6 +48,15 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// =========================
+// DATABASE INIT
+// =========================
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.EnsureCreated();
+}
 
 app.UseCors("AllowAll");
 
@@ -201,7 +210,6 @@ app.MapGet("/donor/{donorId}/embryos", async (HttpContext ctx, int donorId, AppD
     return Results.Ok(data);
 });
 
-// app.MapGet("/", () => "Fertility API running 🚀");
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 app.Urls.Add($"http://*:{port}");
 
