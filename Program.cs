@@ -1,207 +1,343 @@
+// using Microsoft.EntityFrameworkCore;
+// using Microsoft.OpenApi.Models;
+
+// var builder = WebApplication.CreateBuilder(args);
+
+// // =========================
+// // SERVICES
+// // =========================
+// builder.Services.AddEndpointsApiExplorer();
+
+// builder.Services.AddSwaggerGen(options =>
+// {
+//     options.AddSecurityDefinition("RoleHeader", new OpenApiSecurityScheme
+//     {
+//         Name = "role",
+//         Type = SecuritySchemeType.ApiKey,
+//         In = ParameterLocation.Header,
+//         Description = "Enter role: admin / lab / donor"
+//     });
+
+//     options.AddSecurityRequirement(new OpenApiSecurityRequirement
+//     {
+//         {
+//             new OpenApiSecurityScheme
+//             {
+//                 Reference = new OpenApiReference
+//                 {
+//                     Type = ReferenceType.SecurityScheme,
+//                     Id = "RoleHeader"
+//                 }
+//             },
+//             Array.Empty<string>()
+//         }
+//     });
+// });
+
+// builder.Services.AddDbContext<AppDbContext>(options =>
+//     options.UseSqlite("Data Source=fertility.db"));
+
+// builder.Services.AddCors(options =>
+// {
+//     options.AddPolicy("AllowAll", policy =>
+//     {
+//         policy.AllowAnyOrigin()
+//               .AllowAnyMethod()
+//               .AllowAnyHeader();
+//     });
+// });
+
+// var app = builder.Build();
+
+// // =========================
+// // DATABASE INIT
+// // =========================
+// using (var scope = app.Services.CreateScope())
+// {
+//     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+//     db.Database.EnsureCreated();
+// }
+
+// app.UseCors("AllowAll");
+
+// // =========================
+// // MIDDLEWARE
+// // =========================
+// app.UseDefaultFiles();
+// app.UseStaticFiles();
+
+// app.UseSwagger();
+// app.UseSwaggerUI();
+
+// // =========================
+// // ROLE MIDDLEWARE
+// // =========================
+// app.Use(async (context, next) =>
+// {
+//     var role = context.Request.Headers["role"].FirstOrDefault()?.ToLower();
+//     context.Items["Role"] = role ?? "unknown";
+//     await next();
+// });
+
+// string GetRole(HttpContext ctx) =>
+//     ctx.Items["Role"]?.ToString() ?? "unknown";
+
+// // =========================
+// // USER API
+// // =========================
+// app.MapPost("/users", async (User user, AppDbContext db) =>
+// {
+//     db.Users.Add(user);
+//     await db.SaveChangesAsync();
+//     return Results.Ok(user);
+// });
+
+// app.MapGet("/users", async (HttpContext ctx, AppDbContext db) =>
+// {
+//     if (GetRole(ctx) != "admin")
+//         return Results.Unauthorized();
+
+//     return Results.Ok(await db.Users.ToListAsync());
+// });
+
+// // =========================
+// // PATIENT API
+// // =========================
+// app.MapPost("/patients", async (HttpContext ctx, Patient patient, AppDbContext db) =>
+// {
+//     var role = GetRole(ctx);
+
+//     if (role != "admin" && role != "lab")
+//         return Results.Unauthorized();
+
+//     db.Patients.Add(patient);
+//     await db.SaveChangesAsync();
+
+//     return Results.Created($"/patients/{patient.Id}", patient);
+// });
+
+// app.MapGet("/patients", async (HttpContext ctx, AppDbContext db) =>
+// {
+//     var role = GetRole(ctx);
+
+//     if (role != "admin" && role != "lab")
+//         return Results.Unauthorized();
+
+//     return Results.Ok(await db.Patients.ToListAsync());
+// });
+
+// app.MapDelete("/patients/{id}", async (HttpContext ctx, int id, AppDbContext db) =>
+// {
+//     if (GetRole(ctx) != "admin")
+//         return Results.Unauthorized();
+
+//     var patient = await db.Patients.FindAsync(id);
+
+//     if (patient == null)
+//         return Results.NotFound();
+
+//     db.Patients.Remove(patient);
+//     await db.SaveChangesAsync();
+
+//     return Results.Ok();
+// });
+
+// // =========================
+// // DONOR API
+// // =========================
+// app.MapPost("/donors", async (HttpContext ctx, Donor donor, AppDbContext db) =>
+// {
+//     if (GetRole(ctx) != "admin")
+//         return Results.Unauthorized();
+
+//     db.Donors.Add(donor);
+//     await db.SaveChangesAsync();
+//     return Results.Ok(donor);
+// });
+
+// // =========================
+// // EMBRYO API
+// // =========================
+// app.MapPost("/embryos", async (HttpContext ctx, Embryo embryo, AppDbContext db) =>
+// {
+//     var role = GetRole(ctx);
+
+//     if (role != "admin" && role != "lab")
+//         return Results.Unauthorized();
+
+//     var patient = await db.Patients.FindAsync(embryo.PatientId);
+//     var donor = await db.Donors.FindAsync(embryo.DonorId);
+
+//     if (patient == null || donor == null)
+//         return Results.BadRequest("Invalid PatientId or DonorId");
+
+//     if (string.IsNullOrWhiteSpace(embryo.Status))
+//         embryo.Status = "Stored";
+
+//     db.Embryos.Add(embryo);
+//     await db.SaveChangesAsync();
+
+//     return Results.Created($"/embryos/{embryo.Id}", embryo);
+// });
+
+// app.MapGet("/embryos", async (HttpContext ctx, AppDbContext db) =>
+// {
+//     var role = GetRole(ctx);
+
+//     if (role != "admin" && role != "lab")
+//         return Results.Unauthorized();
+
+//     return Results.Ok(await db.Embryos
+//         .Include(e => e.Patient)
+//         .Include(e => e.Donor)
+//         .ToListAsync());
+// });
+
+// app.MapGet("/donor/{donorId}/embryos", async (HttpContext ctx, int donorId, AppDbContext db) =>
+// {
+//     if (GetRole(ctx) != "donor")
+//         return Results.Unauthorized();
+
+//     var data = await db.Embryos
+//         .Where(e => e.DonorId == donorId)
+//         .Select(e => new
+//         {
+//             e.Id,
+//             e.Status
+//         })
+//         .ToListAsync();
+
+//     return Results.Ok(data);
+// });
+
+// var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+// app.Urls.Add($"http://*:{port}");
+
+// app.Run();
+
+// // =========================
+// // MODELS
+// // =========================
+// public class Patient
+// {
+//     public int Id { get; set; }
+//     public string Name { get; set; } = "";
+//     public int Age { get; set; }
+//     public string TreatmentStage { get; set; } = "";
+// }
+
+// public class User
+// {
+//     public int Id { get; set; }
+//     public string Email { get; set; } = "";
+//     public string Role { get; set; } = "";
+// }
+
+// public class Donor
+// {
+//     public int Id { get; set; }
+//     public string Code { get; set; } = "";
+// }
+
+// public class Embryo
+// {
+//     public int Id { get; set; }
+
+//     public int PatientId { get; set; }
+//     public Patient Patient { get; set; } = null!;
+
+//     public int DonorId { get; set; }
+//     public Donor Donor { get; set; } = null!;
+
+//     public string Status { get; set; } = "";
+// }
+
+// // =========================
+// // DB CONTEXT
+// // =========================
+// public class AppDbContext : DbContext
+// {
+//     public AppDbContext(DbContextOptions<AppDbContext> options)
+//         : base(options) { }
+
+//     public DbSet<User> Users { get; set; }
+//     public DbSet<Patient> Patients { get; set; }
+//     public DbSet<Donor> Donors { get; set; }
+//     public DbSet<Embryo> Embryos { get; set; }
+// }
+
 using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// =========================
-// SERVICES
-// =========================
-builder.Services.AddEndpointsApiExplorer();
-
-builder.Services.AddSwaggerGen(options =>
-{
-    options.AddSecurityDefinition("RoleHeader", new OpenApiSecurityScheme
-    {
-        Name = "role",
-        Type = SecuritySchemeType.ApiKey,
-        In = ParameterLocation.Header,
-        Description = "Enter role: admin / lab / donor"
-    });
-
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "RoleHeader"
-                }
-            },
-            Array.Empty<string>()
-        }
-    });
-});
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite("Data Source=fertility.db"));
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
+    options.AddPolicy("AllowAll", p =>
+        p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 });
 
 var app = builder.Build();
 
-// =========================
-// DATABASE INIT
-// =========================
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
-}
-
 app.UseCors("AllowAll");
-
-// =========================
-// MIDDLEWARE
-// =========================
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-app.UseSwagger();
-app.UseSwaggerUI();
+string GetRole(HttpRequest req) =>
+    req.Headers["role"].ToString().ToLower();
 
-// =========================
-// ROLE MIDDLEWARE
-// =========================
-app.Use(async (context, next) =>
+// ================= PATIENT =================
+
+app.MapGet("/patients", async (AppDbContext db, HttpRequest req) =>
 {
-    var role = context.Request.Headers["role"].FirstOrDefault()?.ToLower();
-    context.Items["Role"] = role ?? "unknown";
-    await next();
-});
-
-string GetRole(HttpContext ctx) =>
-    ctx.Items["Role"]?.ToString() ?? "unknown";
-
-// =========================
-// USER API
-// =========================
-app.MapPost("/users", async (User user, AppDbContext db) =>
-{
-    db.Users.Add(user);
-    await db.SaveChangesAsync();
-    return Results.Ok(user);
-});
-
-app.MapGet("/users", async (HttpContext ctx, AppDbContext db) =>
-{
-    if (GetRole(ctx) != "admin")
-        return Results.Unauthorized();
-
-    return Results.Ok(await db.Users.ToListAsync());
-});
-
-// =========================
-// PATIENT API
-// =========================
-app.MapPost("/patients", async (HttpContext ctx, Patient patient, AppDbContext db) =>
-{
-    var role = GetRole(ctx);
-
-    if (role != "admin" && role != "lab")
-        return Results.Unauthorized();
-
-    db.Patients.Add(patient);
-    await db.SaveChangesAsync();
-
-    return Results.Created($"/patients/{patient.Id}", patient);
-});
-
-app.MapGet("/patients", async (HttpContext ctx, AppDbContext db) =>
-{
-    var role = GetRole(ctx);
-
-    if (role != "admin" && role != "lab")
-        return Results.Unauthorized();
+    var role = GetRole(req);
+    if (role == "donor") return Results.Unauthorized();
 
     return Results.Ok(await db.Patients.ToListAsync());
 });
 
-app.MapDelete("/patients/{id}", async (HttpContext ctx, int id, AppDbContext db) =>
+app.MapPost("/patients", async (AppDbContext db, HttpRequest req, Patient p) =>
 {
-    if (GetRole(ctx) != "admin")
-        return Results.Unauthorized();
+    var role = GetRole(req);
+    if (role == "donor") return Results.Unauthorized();
 
-    var patient = await db.Patients.FindAsync(id);
-
-    if (patient == null)
-        return Results.NotFound();
-
-    db.Patients.Remove(patient);
+    db.Patients.Add(p);
     await db.SaveChangesAsync();
+    return Results.Ok(p);
+});
 
+app.MapDelete("/patients/{id}", async (AppDbContext db, HttpRequest req, int id) =>
+{
+    var role = GetRole(req);
+    if (role != "admin") return Results.Unauthorized();
+
+    var p = await db.Patients.FindAsync(id);
+    if (p == null) return Results.NotFound();
+
+    db.Patients.Remove(p);
+    await db.SaveChangesAsync();
     return Results.Ok();
 });
 
-// =========================
-// DONOR API
-// =========================
-app.MapPost("/donors", async (HttpContext ctx, Donor donor, AppDbContext db) =>
-{
-    if (GetRole(ctx) != "admin")
-        return Results.Unauthorized();
+// ================= DONORS =================
 
-    db.Donors.Add(donor);
-    await db.SaveChangesAsync();
-    return Results.Ok(donor);
+app.MapGet("/donors", async (AppDbContext db, HttpRequest req) =>
+{
+    var role = GetRole(req);
+    if (role == "donor") return Results.Unauthorized();
+
+    return Results.Ok(await db.Donors.ToListAsync());
 });
 
-// =========================
-// EMBRYO API
-// =========================
-app.MapPost("/embryos", async (HttpContext ctx, Embryo embryo, AppDbContext db) =>
+// ================= DONOR VIEW =================
+
+app.MapGet("/donor/{id}/embryos", async (AppDbContext db, int id) =>
 {
-    var role = GetRole(ctx);
-
-    if (role != "admin" && role != "lab")
-        return Results.Unauthorized();
-
-    var patient = await db.Patients.FindAsync(embryo.PatientId);
-    var donor = await db.Donors.FindAsync(embryo.DonorId);
-
-    if (patient == null || donor == null)
-        return Results.BadRequest("Invalid PatientId or DonorId");
-
-    if (string.IsNullOrWhiteSpace(embryo.Status))
-        embryo.Status = "Stored";
-
-    db.Embryos.Add(embryo);
-    await db.SaveChangesAsync();
-
-    return Results.Created($"/embryos/{embryo.Id}", embryo);
-});
-
-app.MapGet("/embryos", async (HttpContext ctx, AppDbContext db) =>
-{
-    var role = GetRole(ctx);
-
-    if (role != "admin" && role != "lab")
-        return Results.Unauthorized();
-
-    return Results.Ok(await db.Embryos
-        .Include(e => e.Patient)
-        .Include(e => e.Donor)
-        .ToListAsync());
-});
-
-app.MapGet("/donor/{donorId}/embryos", async (HttpContext ctx, int donorId, AppDbContext db) =>
-{
-    if (GetRole(ctx) != "donor")
-        return Results.Unauthorized();
-
     var data = await db.Embryos
-        .Where(e => e.DonorId == donorId)
-        .Select(e => new
-        {
+        .Where(e => e.DonorId == id)
+        .Select(e => new {
             e.Id,
             e.Status
         })
@@ -210,58 +346,62 @@ app.MapGet("/donor/{donorId}/embryos", async (HttpContext ctx, int donorId, AppD
     return Results.Ok(data);
 });
 
-var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-app.Urls.Add($"http://*:{port}");
+// ================= ADMIN ONLY =================
+
+app.MapGet("/admin/records", async (AppDbContext db, HttpRequest req) =>
+{
+    var role = GetRole(req);
+    if (role != "admin") return Results.Unauthorized();
+
+    var data = await db.Embryos
+        .Include(e => e.Patient)
+        .Include(e => e.Donor)
+        .Select(e => new {
+            EmbryoId = e.Id,
+            Status = e.Status,
+            PatientName = e.Patient.Name,
+            DonorName = e.Donor.Name
+        })
+        .ToListAsync();
+
+    return Results.Ok(data);
+});
 
 app.Run();
 
-// =========================
-// MODELS
-// =========================
-public class Patient
+// ================= MODELS =================
+
+class AppDbContext : DbContext
+{
+    public AppDbContext(DbContextOptions options) : base(options) { }
+
+    public DbSet<Patient> Patients => Set<Patient>();
+    public DbSet<Donor> Donors => Set<Donor>();
+    public DbSet<Embryo> Embryos => Set<Embryo>();
+}
+
+class Patient
 {
     public int Id { get; set; }
-    public string Name { get; set; } = "";
+    public string Name { get; set; }
     public int Age { get; set; }
-    public string TreatmentStage { get; set; } = "";
+    public string TreatmentStage { get; set; }
 }
 
-public class User
+class Donor
 {
     public int Id { get; set; }
-    public string Email { get; set; } = "";
-    public string Role { get; set; } = "";
+    public string Name { get; set; }
 }
 
-public class Donor
+class Embryo
 {
     public int Id { get; set; }
-    public string Code { get; set; } = "";
-}
-
-public class Embryo
-{
-    public int Id { get; set; }
+    public string Status { get; set; }
 
     public int PatientId { get; set; }
-    public Patient Patient { get; set; } = null!;
+    public Patient Patient { get; set; }
 
     public int DonorId { get; set; }
-    public Donor Donor { get; set; } = null!;
-
-    public string Status { get; set; } = "";
-}
-
-// =========================
-// DB CONTEXT
-// =========================
-public class AppDbContext : DbContext
-{
-    public AppDbContext(DbContextOptions<AppDbContext> options)
-        : base(options) { }
-
-    public DbSet<User> Users { get; set; }
-    public DbSet<Patient> Patients { get; set; }
-    public DbSet<Donor> Donors { get; set; }
-    public DbSet<Embryo> Embryos { get; set; }
+    public Donor Donor { get; set; }
 }

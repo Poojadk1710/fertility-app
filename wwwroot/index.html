@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
@@ -317,6 +317,526 @@ async function deletePatient(id) {
     } else {
       setStatus(await readError(res), false);
     }
+  } catch (err) {
+    setStatus(`Network error: ${err.message}`, false);
+  }
+}
+
+updateRoleUI();
+</script>
+
+</body>
+</html> -->
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>The IVF Guide - Fertility Dashboard</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f5f7fa;
+  margin: 0;
+  padding: 20px;
+}
+
+h1 {
+  text-align: center;
+}
+
+.container {
+  max-width: 1100px;
+  margin: auto;
+}
+
+.card {
+  background: white;
+  padding: 20px;
+  margin-bottom: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+input, select {
+  padding: 10px;
+  margin: 5px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  min-width: 180px;
+}
+
+button {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin: 5px;
+  color: white;
+  font-size: 16px;
+}
+
+.primary { background: #007bff; }
+.danger { background: #dc3545; }
+.success { background: #28a745; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+th, td {
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+  text-align: center;
+}
+
+tr:hover {
+  background: #f1f1f1;
+}
+
+.status {
+  margin-top: 10px;
+  font-weight: bold;
+}
+
+.hidden {
+  display: none;
+}
+
+ul {
+  padding-left: 20px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>The IVF Guide - Fertility Dashboard</h1>
+
+  <div class="card">
+    <div class="row">
+      <label for="role"><strong>Role:</strong></label>
+      <select id="role" onchange="updateRoleUI()">
+        <option value="admin">Admin</option>
+        <option value="lab">Lab</option>
+        <option value="donor">Donor</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- ADD PATIENT -->
+  <div class="card" id="addPatientCard">
+    <h3>Add Patient</h3>
+    <div class="row">
+      <input id="name" placeholder="Name">
+      <input id="age" type="number" placeholder="Age" min="1">
+      <select id="stage">
+        <option>Consultation</option>
+        <option>Stimulation</option>
+        <option>Egg Retrieval</option>
+        <option>Fertilization</option>
+        <option>Embryo Transfer</option>
+        <option>Pregnancy Test</option>
+      </select>
+      <button class="success" onclick="addPatient()">Add Patient</button>
+    </div>
+  </div>
+
+  <!-- PATIENT ACTIONS -->
+  <div class="card" id="patientActionsCard">
+    <button class="primary" onclick="loadPatients()">Load Patients</button>
+  </div>
+
+  <!-- DONORS -->
+  <div class="card" id="donorActionsCard">
+    <h3>Donors</h3>
+    <button class="primary" onclick="loadDonors()">Load Donors</button>
+    <ul id="donorList"></ul>
+  </div>
+
+  <!-- ADMIN ONLY RECORDS -->
+  <div class="card hidden" id="adminRecordsCard">
+    <h3>Admin Records: Donor → Embryo → Patient</h3>
+    <button class="primary" onclick="loadAdminRecords()">Load Records</button>
+    <table>
+      <thead>
+        <tr>
+          <th>Embryo ID</th>
+          <th>Patient</th>
+          <th>Donor</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="recordsTableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- PATIENT TABLE -->
+  <div class="card" id="patientsTableCard">
+    <h3>Patients</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Age</th>
+          <th>Stage</th>
+          <th id="actionHeader">Action</th>
+        </tr>
+      </thead>
+      <tbody id="patientsTableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- DONOR VIEW -->
+  <div class="card hidden" id="donorViewCard">
+    <h3>Donor Embryo Status</h3>
+    <div class="row">
+      <input id="donorId" type="number" placeholder="Enter Donor ID">
+      <button class="primary" onclick="loadDonorEmbryos()">Load Embryo Status</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="donorTableCard">
+    <h3>Embryo Status</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Embryo ID</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="donorEmbryoBody"></tbody>
+    </table>
+  </div>
+
+  <div class="status" id="status"></div>
+
+</div>
+
+<script>
+const API = window.location.origin;
+
+function getRole() {
+  return document.getElementById("role").value;
+}
+
+function getHeaders() {
+  return {
+    "Content-Type": "application/json",
+    "role": getRole()
+  };
+}
+
+function setStatus(msg, ok = true) {
+  const el = document.getElementById("status");
+  el.style.color = ok ? "green" : "red";
+  el.innerText = msg;
+}
+
+async function readError(res) {
+  const text = await res.text();
+  return text ? `HTTP ${res.status}: ${text}` : `HTTP ${res.status}`;
+}
+
+function clearPatientsTable() {
+  document.getElementById("patientsTableBody").innerHTML = "";
+}
+
+function clearDonorList() {
+  document.getElementById("donorList").innerHTML = "";
+}
+
+function clearRecordsTable() {
+  document.getElementById("recordsTableBody").innerHTML = "";
+}
+
+function clearDonorEmbryoTable() {
+  document.getElementById("donorEmbryoBody").innerHTML = "";
+}
+
+function updateRoleUI() {
+  const role = getRole();
+
+  const addPatientCard = document.getElementById("addPatientCard");
+  const patientActionsCard = document.getElementById("patientActionsCard");
+  const patientsTableCard = document.getElementById("patientsTableCard");
+  const donorActionsCard = document.getElementById("donorActionsCard");
+  const donorViewCard = document.getElementById("donorViewCard");
+  const donorTableCard = document.getElementById("donorTableCard");
+  const adminRecordsCard = document.getElementById("adminRecordsCard");
+  const actionHeader = document.getElementById("actionHeader");
+
+  clearPatientsTable();
+  clearDonorList();
+  clearRecordsTable();
+  clearDonorEmbryoTable();
+  setStatus("");
+
+  if (role === "donor") {
+    addPatientCard.classList.add("hidden");
+    patientActionsCard.classList.add("hidden");
+    patientsTableCard.classList.add("hidden");
+    donorActionsCard.classList.add("hidden");
+    adminRecordsCard.classList.add("hidden");
+
+    donorViewCard.classList.remove("hidden");
+    donorTableCard.classList.remove("hidden");
+  } else {
+    addPatientCard.classList.remove("hidden");
+    patientActionsCard.classList.remove("hidden");
+    patientsTableCard.classList.remove("hidden");
+    donorActionsCard.classList.remove("hidden");
+    donorViewCard.classList.add("hidden");
+    donorTableCard.classList.add("hidden");
+
+    if (role === "admin") {
+      adminRecordsCard.classList.remove("hidden");
+      actionHeader.classList.remove("hidden");
+    } else {
+      adminRecordsCard.classList.add("hidden");
+      actionHeader.classList.add("hidden");
+    }
+  }
+}
+
+async function addPatient() {
+  const role = getRole();
+  if (role === "donor") {
+    setStatus("HTTP 401: Donor cannot add patients", false);
+    return;
+  }
+
+  const name = document.getElementById("name").value.trim();
+  const ageValue = document.getElementById("age").value;
+  const age = Number(ageValue);
+  const stage = document.getElementById("stage").value;
+
+  if (!name) {
+    setStatus("Please enter patient name", false);
+    return;
+  }
+
+  if (!ageValue || Number.isNaN(age) || age <= 0) {
+    setStatus("Please enter a valid numeric age", false);
+    return;
+  }
+
+  const data = {
+    name: name,
+    age: age,
+    treatmentStage: stage
+  };
+
+  try {
+    const res = await fetch(`${API}/patients`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+
+    if (res.ok) {
+      setStatus("Patient added ✅");
+      document.getElementById("name").value = "";
+      document.getElementById("age").value = "";
+      document.getElementById("stage").selectedIndex = 0;
+    } else {
+      setStatus(await readError(res), false);
+    }
+  } catch (err) {
+    setStatus(`Network error: ${err.message}`, false);
+  }
+}
+
+async function loadPatients() {
+  const role = getRole();
+  if (role === "donor") {
+    setStatus("HTTP 401: Donor cannot view patients", false);
+    return;
+  }
+
+  clearPatientsTable();
+
+  try {
+    const res = await fetch(`${API}/patients`, {
+      headers: getHeaders()
+    });
+
+    if (!res.ok) {
+      setStatus(await readError(res), false);
+      return;
+    }
+
+    const data = await res.json();
+    const tbody = document.getElementById("patientsTableBody");
+
+    data.forEach(p => {
+      const showDelete = role === "admin";
+      tbody.innerHTML += `
+        <tr>
+          <td>${p.id}</td>
+          <td>${p.name}</td>
+          <td>${p.age}</td>
+          <td>${p.treatmentStage}</td>
+          <td>${showDelete ? `<button class="danger" onclick="deletePatient(${p.id})">Delete</button>` : ``}</td>
+        </tr>
+      `;
+    });
+
+    setStatus("Patients loaded ✅");
+  } catch (err) {
+    clearPatientsTable();
+    setStatus(`Network error: ${err.message}`, false);
+  }
+}
+
+async function deletePatient(id) {
+  if (getRole() !== "admin") {
+    setStatus("HTTP 401: Only admin can delete patients", false);
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API}/patients/${id}`, {
+      method: "DELETE",
+      headers: getHeaders()
+    });
+
+    if (res.ok) {
+      setStatus("Deleted ✅");
+      loadPatients();
+    } else {
+      setStatus(await readError(res), false);
+    }
+  } catch (err) {
+    setStatus(`Network error: ${err.message}`, false);
+  }
+}
+
+async function loadDonors() {
+  const role = getRole();
+  if (role === "donor") {
+    setStatus("HTTP 401: Donor cannot view donor list", false);
+    return;
+  }
+
+  clearDonorList();
+
+  try {
+    const res = await fetch(`${API}/donors`, {
+      headers: getHeaders()
+    });
+
+    if (!res.ok) {
+      setStatus(await readError(res), false);
+      return;
+    }
+
+    const data = await res.json();
+    const donorList = document.getElementById("donorList");
+
+    data.forEach(d => {
+      donorList.innerHTML += `<li>${d.name ?? d.code ?? "Donor"} (ID: ${d.id})</li>`;
+    });
+
+    setStatus("Donors loaded ✅");
+  } catch (err) {
+    setStatus(`Network error: ${err.message}`, false);
+  }
+}
+
+async function loadAdminRecords() {
+  if (getRole() !== "admin") {
+    setStatus("HTTP 401: Admin only", false);
+    return;
+  }
+
+  clearRecordsTable();
+
+  try {
+    const res = await fetch(`${API}/admin/records`, {
+      headers: getHeaders()
+    });
+
+    if (!res.ok) {
+      setStatus(await readError(res), false);
+      return;
+    }
+
+    const data = await res.json();
+    const tbody = document.getElementById("recordsTableBody");
+
+    data.forEach(r => {
+      tbody.innerHTML += `
+        <tr>
+          <td>${r.embryoId}</td>
+          <td>${r.patientName}</td>
+          <td>${r.donorName}</td>
+          <td>${r.status}</td>
+        </tr>
+      `;
+    });
+
+    setStatus("Admin records loaded ✅");
+  } catch (err) {
+    setStatus(`Network error: ${err.message}`, false);
+  }
+}
+
+async function loadDonorEmbryos() {
+  if (getRole() !== "donor") {
+    setStatus("Only donor can use this view", false);
+    return;
+  }
+
+  clearDonorEmbryoTable();
+
+  const donorId = document.getElementById("donorId").value;
+  if (!donorId) {
+    setStatus("Please enter donor ID", false);
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API}/donor/${donorId}/embryos`, {
+      headers: getHeaders()
+    });
+
+    if (!res.ok) {
+      setStatus(await readError(res), false);
+      return;
+    }
+
+    const data = await res.json();
+    const tbody = document.getElementById("donorEmbryoBody");
+
+    if (data.length === 0) {
+      setStatus("No embryos found for this donor");
+      return;
+    }
+
+    data.forEach(e => {
+      tbody.innerHTML += `
+        <tr>
+          <td>${e.id}</td>
+          <td>${e.status}</td>
+        </tr>
+      `;
+    });
+
+    setStatus("Embryo status loaded ✅");
   } catch (err) {
     setStatus(`Network error: ${err.message}`, false);
   }
