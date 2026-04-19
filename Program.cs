@@ -63,9 +63,7 @@ app.UseStaticFiles();
 string GetRole(HttpContext ctx) =>
     ctx.Request.Headers["role"].FirstOrDefault()?.ToLower() ?? "unknown";
 
-// =========================
 // PATIENTS
-// =========================
 app.MapPost("/patients", async (HttpContext ctx, Patient patient, AppDbContext db) =>
 {
     var role = GetRole(ctx);
@@ -104,9 +102,7 @@ app.MapDelete("/patients/{id}", async (HttpContext ctx, int id, AppDbContext db)
     return Results.Ok();
 });
 
-// =========================
 // DONORS
-// =========================
 app.MapPost("/donors", async (HttpContext ctx, Donor donor, AppDbContext db) =>
 {
     if (GetRole(ctx) != "admin")
@@ -128,9 +124,7 @@ app.MapGet("/donors", async (HttpContext ctx, AppDbContext db) =>
     return Results.Ok(await db.Donors.ToListAsync());
 });
 
-// =========================
 // EMBRYOS
-// =========================
 app.MapPost("/embryos", async (HttpContext ctx, Embryo embryo, AppDbContext db) =>
 {
     var role = GetRole(ctx);
@@ -166,9 +160,7 @@ app.MapGet("/embryos", async (HttpContext ctx, AppDbContext db) =>
         .ToListAsync());
 });
 
-// =========================
 // DONOR VIEW
-// =========================
 app.MapGet("/donor/{donorId}/embryos", async (HttpContext ctx, int donorId, AppDbContext db) =>
 {
     if (GetRole(ctx) != "donor")
@@ -186,9 +178,7 @@ app.MapGet("/donor/{donorId}/embryos", async (HttpContext ctx, int donorId, AppD
     return Results.Ok(data);
 });
 
-// =========================
 // ADMIN-ONLY RECORDS
-// =========================
 app.MapGet("/admin/records", async (HttpContext ctx, AppDbContext db) =>
 {
     if (GetRole(ctx) != "admin")
@@ -214,9 +204,7 @@ app.Urls.Add($"http://*:{port}");
 
 app.Run();
 
-// =========================
 // MODELS
-// =========================
 public class Patient
 {
     public int Id { get; set; }
@@ -244,9 +232,7 @@ public class Embryo
     public string Status { get; set; } = "";
 }
 
-// =========================
 // DB CONTEXT
-// =========================
 public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options)

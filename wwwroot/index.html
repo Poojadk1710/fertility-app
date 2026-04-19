@@ -7,7 +7,7 @@
 <style>
 body {
   font-family: Arial, sans-serif;
-  background: #f5f7fa;
+  background: #eabae3;
   margin: 0;
   padding: 20px;
 }
@@ -343,7 +343,7 @@ function updateRoleUI() {
 
 function downloadCSV(filename, rows) {
   if (!rows.length) {
-    setStatus("Nothing to download ❌", false);
+    setStatus("Nothing to download", false);
     return;
   }
 
@@ -389,7 +389,7 @@ async function addPatient() {
     });
 
     if (res.ok) {
-      setStatus("Patient added ✅");
+      setStatus("Patient added");
       document.getElementById("name").value = "";
       document.getElementById("age").value = "";
       document.getElementById("stage").selectedIndex = 0;
@@ -422,7 +422,7 @@ async function addDonor() {
     });
 
     if (res.ok) {
-      setStatus("Donor added ✅");
+      setStatus("Donor added");
       document.getElementById("donorCode").value = "";
       await loadDonors();
     } else {
@@ -457,7 +457,7 @@ async function addEmbryo() {
     });
 
     if (res.ok) {
-      setStatus("Embryo record added ✅");
+      setStatus("Embryo record added");
       document.getElementById("embryoPatientId").value = "";
       document.getElementById("embryoDonorId").value = "";
       document.getElementById("embryoStatus").selectedIndex = 0;
@@ -506,7 +506,7 @@ async function loadPatients(showMessage = true) {
       `;
     });
 
-    if (showMessage) setStatus("Patients loaded ✅");
+    if (showMessage) setStatus("Patients loaded");
   } catch (err) {
     setStatus(`Network error: ${err.message}`, false);
   }
@@ -525,7 +525,7 @@ async function deletePatient(id) {
     });
 
     if (res.ok) {
-      setStatus("Deleted ✅");
+      setStatus("Deleted");
       await loadPatients(false);
     } else {
       setStatus(await readError(res), false);
@@ -562,7 +562,7 @@ async function loadDonors() {
       donorList.innerHTML += `<li>${d.code} (ID: ${d.id})</li>`;
     });
 
-    setStatus("Donors loaded ✅");
+    setStatus("Donors loaded");
   } catch (err) {
     setStatus(`Network error: ${err.message}`, false);
   }
@@ -602,7 +602,7 @@ async function loadAdminRecords() {
       `;
     });
 
-    setStatus("Admin records loaded ✅");
+    setStatus("Admin records loaded");
   } catch (err) {
     setStatus(`Network error: ${err.message}`, false);
   }
@@ -652,7 +652,7 @@ async function loadDonorEmbryos(showMessage = true) {
       `;
     });
 
-    if (showMessage) setStatus("Embryo status loaded ✅");
+    if (showMessage) setStatus("Embryo status loaded");
   } catch (err) {
     setStatus(`Network error: ${err.message}`, false);
   }
@@ -667,7 +667,7 @@ async function downloadPatientsCSV() {
     ...patientsCache.map(p => [p.id, p.name, p.age, p.treatmentStage])
   ];
   downloadCSV("patients.csv", rows);
-  setStatus("Patients CSV downloaded ✅");
+  setStatus("Patients CSV downloaded");
 }
 
 async function downloadDonorsCSV() {
@@ -679,12 +679,12 @@ async function downloadDonorsCSV() {
     ...donorsCache.map(d => [d.id, d.code])
   ];
   downloadCSV("donors.csv", rows);
-  setStatus("Donors CSV downloaded ✅");
+  setStatus("Donors CSV downloaded");
 }
 
 async function downloadRecordsCSV() {
   if (getRole() !== "admin") {
-    setStatus("Admin only ❌", false);
+    setStatus("Admin only", false);
     return;
   }
 
@@ -696,12 +696,12 @@ async function downloadRecordsCSV() {
     ...recordsCache.map(r => [r.embryoId, r.patientName, r.donorCode, r.status])
   ];
   downloadCSV("admin-records.csv", rows);
-  setStatus("Admin records CSV downloaded ✅");
+  setStatus("Admin records CSV downloaded");
 }
 
 async function downloadDonorCSV() {
   if (getRole() !== "donor") {
-    setStatus("Donor only ❌", false);
+    setStatus("Donor only", false);
     return;
   }
 
@@ -710,7 +710,7 @@ async function downloadDonorCSV() {
   }
 
   if (!donorEmbryosCache.length) {
-    setStatus("No donor embryo data to download ❌", false);
+    setStatus("No donor embryo data to download", false);
     return;
   }
 
@@ -720,7 +720,7 @@ async function downloadDonorCSV() {
     ...donorEmbryosCache.map(e => [e.id, e.status])
   ];
   downloadCSV(`donor-${donorId}-embryos.csv`, rows);
-  setStatus("Donor embryo CSV downloaded ✅");
+  setStatus("Donor embryo CSV downloaded");
 }
 
 updateRoleUI();
