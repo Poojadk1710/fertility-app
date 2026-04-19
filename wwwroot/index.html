@@ -127,7 +127,7 @@ tr:hover { background: #f1f1f1; }
 
 </div>
 
-<script>
+<!-- <script>
 const API = window.location.origin;
 
 // -------------------------
@@ -233,7 +233,105 @@ async function deletePatient(id) {
     setStatus("Network error ", false);
   }
 }
-</script>
+</script> -->
+<script>
+const API = window.location.origin;
 
+function getHeaders() {
+  return {
+    "Content-Type": "application/json",
+    "role": document.getElementById("role").value
+  };
+}
+
+function setStatus(msg, ok = true) {
+  const el = document.getElementById("status");
+  el.style.color = ok ? "green" : "red";
+  el.innerText = msg;
+}
+
+async function readError(res) {
+  const text = await res.text();
+  return text ? `HTTP ${res.status}: ${text}` : `HTTP ${res.status}`;
+}
+
+async function addPatient() {
+  const data = {
+    name: document.getElementById("name").value,
+    age: parseInt(document.getElementById("age").value),
+    treatmentStage: document.getElementById("stage").value
+  };
+
+  try {
+    const res = await fetch(`${API}/patients`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+
+    if (res.ok) {
+      setStatus("Patient added ✅");
+      loadPatients();
+    } else {
+      setStatus(await readError(res), false);
+    }
+  } catch (err) {
+    setStatus(`Network error: ${err.message}`, false);
+  }
+}
+
+async function loadPatients() {
+  try {
+    const res = await fetch(`${API}/patients`, {
+      headers: getHeaders()
+    });
+
+    if (!res.ok) {
+      setStatus(await readError(res), false);
+      return;
+    }
+
+    const data = await res.json();
+    const tbody = document.getElementById("tableBody");
+    tbody.innerHTML = "";
+
+    data.forEach(p => {
+      tbody.innerHTML += `
+        <tr>
+          <td>${p.id}</td>
+          <td>${p.name}</td>
+          <td>${p.age}</td>
+          <td>${p.treatmentStage}</td>
+          <td>
+            <button class="danger" onclick="deletePatient(${p.id})">Delete</button>
+          </td>
+        </tr>
+      `;
+    });
+
+    setStatus("Patients loaded ✅");
+  } catch (err) {
+    setStatus(`Network error: ${err.message}`, false);
+  }
+}
+
+async function deletePatient(id) {
+  try {
+    const res = await fetch(`${API}/patients/${id}`, {
+      method: "DELETE",
+      headers: getHeaders()
+    });
+
+    if (res.ok) {
+      setStatus("Deleted ✅");
+      loadPatients();
+    } else {
+      setStatus(await readError(res), false);
+    }
+  } catch (err) {
+    setStatus(`Network error: ${err.message}`, false);
+  }
+}
+</script>
 </body>
 </html>
