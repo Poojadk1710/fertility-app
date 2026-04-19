@@ -55,15 +55,16 @@ This project demonstrates:
 
 ##  Project Structure
 
+```
 FertilityApp/
 ├── Program.cs
 ├── fertility.db
 ├── wwwroot/
-│ └── index.html # Dashboard UI
+│   └── index.html   # Dashboard UI
 ├── Migrations/
 ├── Dockerfile
 └── appsettings.json
-
+```
 
 ---
 
