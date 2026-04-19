@@ -1,6 +1,5 @@
-@FertilityApp_HostAddress = http://localhost:5179
+@baseUrl = https://fertility-app-3.onrender.com/patients 
 
-GET {{FertilityApp_HostAddress}}/weatherforecast/
+GET {{baseUrl}}/patients
 Accept: application/json
-
-###
+role: admin
