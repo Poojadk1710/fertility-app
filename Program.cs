@@ -189,7 +189,7 @@ app.MapGet("/donor/{donorId}/embryos", async (HttpContext ctx, int donorId, AppD
     return Results.Ok(data);
 });
 
-app.MapGet("/", () => "Fertility API running 🚀");
+// app.MapGet("/", () => "Fertility API running 🚀");
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 app.Urls.Add($"http://*:{port}");
 

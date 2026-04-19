@@ -137,9 +137,93 @@
   <div class="status" id="status"></div>
 
 </div>
-
 <script>
-const API = "http://localhost:5179";
+const API = window.location.origin;
+
+function getHeaders() {
+  return {
+    "Content-Type": "application/json",
+    "role": document.getElementById("role").value
+  };
+}
+
+function setStatus(msg, ok=true) {
+  const el = document.getElementById("status");
+  el.style.color = ok ? "green" : "red";
+  el.innerText = msg;
+}
+
+async function addPatient() {
+  const data = {
+    name: name.value,
+    age: parseInt(age.value),
+    treatmentStage: stage.value
+  };
+
+  const res = await fetch(`${API}/patients`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+
+  if (res.ok) {
+    setStatus("Patient added ✅");
+    loadPatients();
+  } else {
+    setStatus("Failed ❌ (check role)", false);
+  }
+}
+
+async function loadPatients() {
+  const res = await fetch(`${API}/patients`, {
+    headers: getHeaders()
+  });
+
+  if (!res.ok) {
+    setStatus("Unauthorized ❌", false);
+    return;
+  }
+
+  const data = await res.json();
+
+  const tbody = document.querySelector("#table tbody");
+  tbody.innerHTML = "";
+
+  data.forEach(p => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${p.id}</td>
+        <td>${p.name}</td>
+        <td>${p.age}</td>
+        <td>${p.treatmentStage}</td>
+        <td>
+          <button class="danger" onclick="deletePatient(${p.id})">
+            Delete
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+
+  setStatus("Patients loaded 😄");
+}
+
+async function deletePatient(id) {
+  const res = await fetch(`${API}/patients/${id}`, {
+    method: "DELETE",
+    headers: getHeaders()
+  });
+
+  if (res.ok) {
+    setStatus("Deleted ✅");
+    loadPatients();
+  } else {
+    setStatus("Delete failed ❌", false);
+  }
+}
+</script>
+<!-- <script>
+const API = window.location.origin;
 
 function getHeaders() {
   return {
@@ -221,7 +305,7 @@ async function deletePatient(id) {
     setStatus("Delete failed ❌", false);
   }
 }
-</script>
+</script> -->
 
 </body>
 </html>
